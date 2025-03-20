@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Form</title>
+    <link rel="stylesheet" href="style.css"> 
+</head>
+<body>
+
+    <button id="homeButton">Home</button>
+
+<h2>Event Form</h2>
+
+<table id="eventsTable">
+    <thead>
+        <tr>
+            <th>Name</th>
+        </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+<!-- Event detail in the right top corner
+We can have a better layout by using p -->
+
+<div id="eventDetails">
+
+    <h3>Event Details</h3>
+    <p><strong>Name:</strong> <input id="eventName" type="text" disabled></p>
+    <p><strong>Category:</strong> <input id="eventCategory" type="text" disabled></p>
+    <p><strong>Date:</strong> <input id="eventDate" type="text" disabled></p>
+    <p><strong>Time:</strong> <input id="eventTime" type="text" disabled></p>
+    <p><strong>Cost:</strong> <input id="eventCost" type="text" disabled></p>
+    <p><strong>Location:</strong> <input id="eventLocation" type="text" disabled></p>
+    <p><strong>Tag:</strong> <span id="eventTag"></span></p>
+    <p><strong>Coordination:</strong> <span id="eventCoordination"></span></p>
+    <p><strong>Note:</strong> <input id="eventNote" type="text" disabled></p>
+
+    <button id="editButton">Edit</button>
+    <button id="saveButton" class="hidden">Save</button>
+    <button id="weatherButton">Show Weather</button>
+
+</div>
+
+<!--
+Weather Info in the bottom right corner
+--> 
+<div id="weatherDetails" class="hidden">
+    <h3>Weather Info</h3>
+    <p><strong>Temperature:</strong> <span id="weatherTemp"></span>°C</p>
+    <p><strong>Humidity:</strong> <span id="weatherHumidity"></span>%</p>
+    <p><strong>Condition:</strong> <span id="weatherCondition"></span></p>
+</div>
+
+<script>
+
+//this eventListener executes once the HTML is loaded and it applies AJAX
+document.addEventListener("DOMContentLoaded", function () {
+
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "getData.php", true);
+    xhr.onload = function () {
+
+        if (xhr.status >= 200 && xhr.status < 300) {
+
+            var data = JSON.parse(xhr.responseText);
+            //getting tbody from eventsTable
+            var tableBody = document.querySelector("#eventsTable tbody");
+
+            window.eventData = data; 
+
+            //Storing the data into the button
+            data.forEach(event => {
+                var row = document.createElement("tr");
+                row.innerHTML = `
+                    <td>
+                        <button class="event-button" 
+                            data-id="${event.id}"
+                            data-name="${event.name}"
+                            data-category="${event.category}"
+                            data-date="${event.month} ${event.day}"
+                            data-time="${event.time}"
+                            data-cost="${event.cost}"
+                            data-location="${event.location}"
+                            data-tagged="${event.tagged}"
+                            data-coordination="${event.lon_lat}"
+                            data-note="${event.notes || 'Null'}">
+                            ${event.name}  
+                        </button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+
+            //select all
+            document.querySelectorAll(".event-button").forEach(button => {
+                button.addEventListener("click", function () {
+                    //once clicked, shows the info detail
+                    showInfo(this);
+                });
+            });
+        }
+    };
+    xhr.send();
+
+    // Handling the home button to simulate a hiding effect
+    document.getElementById("homeButton").addEventListener("click", function () {
+        hideDetails(); 
+    });
+
+});
+
+// showing event detail
+function showInfo(button) {
+
+    document.getElementById("eventName").value = button.getAttribute("data-name");
+    document.getElementById("eventCategory").value = button.getAttribute("data-category");
+    document.getElementById("eventDate").value = button.getAttribute("data-date");
+    document.getElementById("eventTime").value = button.getAttribute("data-time");
+    document.getElementById("eventCost").value = button.getAttribute("data-cost");
+    document.getElementById("eventLocation").value = button.getAttribute("data-location");
+    document.getElementById("eventTag").innerText = button.getAttribute("data-tagged") == "1" ? "✔" : "✖";
+    document.getElementById("eventCoordination").innerText = button.getAttribute("data-coordination");
+    document.getElementById("eventNote").value = button.getAttribute("data-note");
+
+    //edit
+    document.getElementById("editButton").onclick = function() {
+        editEvent();
+    };
+
+    //save
+    document.getElementById("saveButton").onclick = function() {
+        saveEvent(button.getAttribute("data-id"));
+    };
+
+    //weather
+    document.getElementById("weatherButton").onclick = function() {
+        fetchWeather(button.getAttribute("data-coordination"));
+    };
+
+    document.getElementById("eventDetails").classList.add("show");
+}
+
+// edit
+function editEvent() {
+    //select all
+    document.querySelectorAll("#eventDetails input").forEach(input => {
+        input.disabled = false;
+    });
+}
+
+// save and send
+function saveEvent(eventId) {
+
+    //create a JSON format
+    let updatedEvent = {
+        id: eventId,
+        name: document.getElementById("eventName").value,
+        category: document.getElementById("eventCategory").value,
+        date: document.getElementById("eventDate").value,
+        time: document.getElementById("eventTime").value,
+        cost: document.getElementById("eventCost").value,
+        location: document.getElementById("eventLocation").value,
+        note: document.getElementById("eventNote").value
+    };
+
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", "updateData.php", true);
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.onload = function () {
+
+        if (xhr.status >= 200 && xhr.status < 300) {
+            alert("Event updated successfully!");
+        } else {
+            alert("Error updating event.");
+        }
+    };
+
+    xhr.send(JSON.stringify(updatedEvent));
+
+}
+
+// Getting Weather Info
+function fetchWeather(coordination) {
+
+    //
+    let [lat, lon] = coordination.split(",").map(c => c.trim());
+    let apiKey = "811e7972f6ae406aab7fec747bb8eb99";  
+    let url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`;
+
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+
+            if (data.cod !== 200) {   //check if API is working
+                throw new Error(`Weather API Error: ${data.message}`);
+            }
+
+            document.getElementById("weatherTemp").innerText = data.main.temp;
+            document.getElementById("weatherHumidity").innerText = data.main.humidity;
+            document.getElementById("weatherCondition").innerText = data.weather[0].description;
+            document.getElementById("weatherDetails").classList.add("show");
+        })
+        .catch(error => {
+            console.error("Weather API Error:", error);
+            alert("Failed to load weather data.");
+        });
+
+}
+
+//for home button
+function hideDetails() {
+    document.getElementById("eventDetails").classList.remove("show");
+    document.getElementById("weatherDetails").classList.remove("show");
+}
+
+</script>
+</body>
+</html>
